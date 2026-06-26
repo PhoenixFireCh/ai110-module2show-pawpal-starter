@@ -1,15 +1,78 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
-    %% Keep this file updated so it matches your final implementation.
+    direction LR
 
-    class ClassName {
-        +type attribute
-        +method() returnType
+    class Pet {
+        +str name
+        +str species
+        +str breed
+        +float height
+        +str color
+        +str extra_info
+        +describe() str
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Owner {
+        +str name
+        +TimeWindow availability
+        +time time_constraint
+        +add_pet(pet: Pet) void
+        +available_minutes() int
     }
 
-    ClassName --> AnotherClass : relationship
+    class TimeWindow {
+        +time start
+        +time end
+        +duration_minutes() int
+        +contains(t: time) bool
+    }
+
+    class Task {
+        +str title
+        +Priority priority
+        +int duration_minutes
+        +Recurrence repeats
+        +bool completed
+        +toggle_complete() void
+    }
+
+    class PlanEntry {
+        +Task task
+        +time start_time
+        +time end_time
+    }
+
+    class Schedule {
+        +date day
+        +Owner owner
+        +List~PlanEntry~ entries
+        +generate_plan(tasks: List~Task~) void
+        +sort_by_priority(tasks: List~Task~) List~Task~
+        +filter_by_time(tasks: List~Task~, available: int) List~Task~
+        +resolve_conflicts(entries: List~PlanEntry~) List~PlanEntry~
+        +add_entry(entry: PlanEntry) void
+        +total_minutes() int
+        +explain() str
+    }
+
+    class Priority {
+        <<enumeration>>
+        LOW
+        MEDIUM
+        HIGH
+    }
+
+    class Recurrence {
+        <<enumeration>>
+        NONE
+        DAILY
+        WEEKLY
+    }
+
+    Owner "1" --> "0..*" Pet : owns
+    Owner "1" *-- "1" TimeWindow : availability
+    Task --> Priority : has
+    Task --> Recurrence : repeats
+    PlanEntry "1" --> "1" Task : schedules
+    Schedule "1" *-- "0..*" PlanEntry : contains
+    Schedule --> Owner : for
+    Schedule ..> Task : plans from
