@@ -92,22 +92,14 @@ class Task:
 
     title: str
     priority: Priority
-    duration_minutes: int
     repeats: Recurrence = Recurrence.NONE
     completed: bool = False
+    time_window: TimeWindow | None = None
+    pet: Pet | None = None
 
     def toggle_complete(self) -> None:
         """Flip the completed flag."""
         raise NotImplementedError
-
-
-@dataclass
-class PlanEntry:
-    """A task placed at a concrete time slot within a schedule."""
-
-    task: Task
-    start_time: time
-    end_time: time
 
 
 @dataclass
@@ -116,32 +108,38 @@ class Schedule:
 
     day: date
     owner: Owner
-    entries: list[PlanEntry] = field(default_factory=list)
+    entries: list[Task] = field(default_factory=list)
 
     def generate_plan(self, tasks: list[Task]) -> None:
         """Populate self.entries from tasks, honoring owner availability/priority."""
         raise NotImplementedError
 
-    def sort_by_priority(self, tasks: list[Task]) -> list[Task]:
-        """Return tasks ordered by priority (highest first)."""
-        raise NotImplementedError
-
-    def filter_by_time(self, tasks: list[Task], available: int) -> list[Task]:
-        """Return the subset of tasks that fit within `available` minutes."""
-        raise NotImplementedError
-
-    def resolve_conflicts(self, entries: list[PlanEntry]) -> list[PlanEntry]:
-        """Return entries with overlapping time slots resolved."""
-        raise NotImplementedError
-
-    def add_entry(self, entry: PlanEntry) -> None:
-        """Append a single plan entry to the schedule."""
+    def add_entry(self, task: Task) -> None:
+        """Append a single scheduled task to the schedule."""
         raise NotImplementedError
 
     def total_minutes(self) -> int:
         """Total minutes consumed by all scheduled entries."""
         raise NotImplementedError
 
-    def explain(self) -> str:
-        """Human-readable explanation of why the plan looks the way it does."""
+
+@dataclass
+class Account:
+    """The current app instance: the owner, their pets, all tasks, and the plan."""
+
+    owner: Owner
+    pets: list[Pet] = field(default_factory=list)
+    tasks: list[Task] = field(default_factory=list)
+    schedule: Schedule | None = None
+
+    def add_pet(self, pet: Pet) -> None:
+        """Track a new pet on this account."""
+        raise NotImplementedError
+
+    def add_task(self, task: Task) -> None:
+        """Add a task to the unsorted task list."""
+        raise NotImplementedError
+
+    def create_schedule(self) -> Schedule:
+        """Build the current schedule from the account's owner and tasks."""
         raise NotImplementedError
