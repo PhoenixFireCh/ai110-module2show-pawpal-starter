@@ -38,7 +38,7 @@ class Recurrence(Enum):
 
 @dataclass
 class TimeWindow:
-    """A span of time, e.g. an owner's daily availability (8:00am–5:00pm)."""
+    """A span of time (8:00am–5:00pm)."""
 
     start: time
     end: time
@@ -75,11 +75,6 @@ class Owner:
     name: str
     availability: TimeWindow
     time_constraint: time
-    pets: list[Pet] = field(default_factory=list)
-
-    def add_pet(self, pet: Pet) -> None:
-        """Associate a pet with this owner."""
-        raise NotImplementedError
 
     def available_minutes(self) -> int:
         """Minutes available for care tasks, derived from availability/constraints."""
@@ -107,10 +102,9 @@ class Schedule:
     """A day's plan. Building it generates entries from an input list of tasks."""
 
     day: date
-    owner: Owner
     entries: list[Task] = field(default_factory=list)
 
-    def generate_plan(self, tasks: list[Task]) -> None:
+    def generate_plan(self, owner: Owner, tasks: list[Task]) -> None:
         """Populate self.entries from tasks, honoring owner availability/priority."""
         raise NotImplementedError
 

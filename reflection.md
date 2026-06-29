@@ -4,8 +4,14 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+- In this design for my UML, I made it such that each important category such as a schedule, pet, or task have an individual class to improve readability of the whole system as each class has their individual tasks.
+- Classes I included and their function:
+> TimeWindow: Describes a time span and it's duration in minutes. 
+> Pet: The pet with all information of the pet
+> Owner: The owner with information such name, and avaiability.
+> Task: A task that contains the title, pet to be cared for, whether it is daily or weekly, when it is done, the priority, and whether it is completed.
+> Schedule: Houses a complete schedule for the day based on the costraints such as owner and priorities.
+> Account: represents this instance of the app, pulls everything together. 
 
 **b. Design changes**
 

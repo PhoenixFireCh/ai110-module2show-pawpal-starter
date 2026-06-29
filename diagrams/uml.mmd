@@ -15,7 +15,6 @@ classDiagram
         +str name
         +TimeWindow availability
         +time time_constraint
-        +add_pet(pet: Pet) void
         +available_minutes() int
     }
 
@@ -38,9 +37,8 @@ classDiagram
 
     class Schedule {
         +date day
-        +Owner owner
         +List~Task~ entries
-        +generate_plan(tasks: List~Task~) void
+        +generate_plan(owner: Owner, tasks: List~Task~) void
         +add_entry(task: Task) void
         +total_minutes() int
     }
@@ -73,12 +71,11 @@ classDiagram
     Account "1" --> "0..*" Pet : tracks
     Account "1" --> "0..*" Task : collects
     Account "1" --> "0..1" Schedule : current
-    Owner "1" --> "0..*" Pet : owns
     Owner "1" *-- "1" TimeWindow : availability
     Task --> Priority : has
     Task --> Recurrence : repeats
     Task "1" --> "0..1" TimeWindow : window
     Task "1" --> "0..1" Pet : cares for
     Schedule "1" *-- "0..*" Task : contains
-    Schedule --> Owner : for
+    Schedule ..> Owner : plans for
     Schedule ..> Task : plans from
