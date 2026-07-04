@@ -130,26 +130,39 @@ class Schedule:
 
     day: date
     entries: list[Task] = field(default_factory=list)
+    # Tasks dropped while planning, each paired with the reason it was removed.
+    removed: list = field(default_factory=list)
 
     def generate_plan(self, owner: Owner, tasks: list[Task]) -> None:
         """Build self.entries to fit as many non-overlapping tasks as possible: higher-priority
-        tasks claim slots first, and within each priority earliest-finishing tasks are preferred."""
+        tasks claim slots first, and within each priority earliest-finishing tasks are preferred.
+        Also records into self.removed any active task dropped for conflicting reasons."""
         self.entries = []
+        self.removed = []
         # Rank priorities so HIGH outranks MEDIUM outranks LOW.
         rank = {Priority.LOW: 0, Priority.MEDIUM: 1, Priority.HIGH: 2}
 
-        # Keep only tasks that are incomplete, have a window, and fit inside the owner's window.
-        # Recurrence also decides how task_date is used:
-        #   DAILY  -> date ignored, scheduled every day on its time_window.
-        #   NONE   -> kept only on its exact date.
-        #   WEEKLY -> kept only when its date's weekday matches the schedule's weekday.
-        candidates = [
+        # Keep only tasks active on this day: with a window, still pending, and matching recurrence.
+        # A completed recurring task counts as pending again once the schedule's day falls in a new
+        # period than when it was last completed (a new day for daily, a new ISO week for weekly).
+        # This check is read-only -- it never unmarks the task's completed flag.
+        active = [
             task
             for task in tasks
-            if not task.completed
-            and task.time_window is not None
-            and owner.availability.contains(task.time_window.start)
-            and owner.availability.contains(task.time_window.end)
+            if task.time_window is not None
+            and (
+                not task.completed
+                or (
+                    task.repeats is Recurrence.DAILY
+                    and task.last_completed is not None
+                    and task.last_completed < self.day
+                )
+                or (
+                    task.repeats is Recurrence.WEEKLY
+                    and task.last_completed is not None
+                    and task.last_completed.isocalendar()[:2] < self.day.isocalendar()[:2]
+                )
+            )
             and (
                 task.repeats is Recurrence.DAILY
                 or (task.repeats is Recurrence.NONE and task.task_date == self.day)
@@ -161,18 +174,34 @@ class Schedule:
             )
         ]
 
+        # Drop active tasks that fall outside the owner's availability, recording the reason.
+        candidates = []
+        for task in active:
+            if owner.availability.contains(task.time_window.start) and owner.availability.contains(
+                task.time_window.end
+            ):
+                candidates.append(task)
+            else:
+                self.removed.append((task, "outside the owner's availability window"))
+
         # Highest priority first; within a priority, earliest end time maximizes how many fit.
         candidates.sort(key=lambda task: (-rank[task.priority], task.time_window.end))
 
-        # Greedily add each task unless its window overlaps one already chosen.
+        # Greedily add each task unless it overlaps one already chosen; record the clash otherwise.
         for task in candidates:
-            overlaps = any(
-                task.time_window.start < entry.time_window.end
-                and entry.time_window.start < task.time_window.end
-                for entry in self.entries
+            conflict = next(
+                (
+                    entry
+                    for entry in self.entries
+                    if task.time_window.start < entry.time_window.end
+                    and entry.time_window.start < task.time_window.end
+                ),
+                None,
             )
-            if not overlaps:
+            if conflict is None:
                 self.entries.append(task)
+            else:
+                self.removed.append((task, f"overlaps with '{conflict.title}'"))
 
     def total_minutes(self) -> int:
         """Total minutes consumed by all scheduled entries."""
@@ -199,7 +228,7 @@ class Schedule:
 
 
 @dataclass
-class Account:
+class Scheduler:
     """The current app instance: the owner, their pets, all tasks, and the plan."""
 
     owner: Owner
@@ -239,9 +268,10 @@ class Account:
             Task(title, priority, repeats, time_window=time_window, pet=pet, task_date=task_date)
         )
 
-    def create_schedule(self) -> Schedule:
-        """Build today's schedule from the owner and tasks, store it, and return it."""
-        schedule = Schedule(day=date.today())
+    def create_schedule(self, day: date) -> Schedule:
+        """Build the schedule for the given day from the owner and tasks, store it, and return it.
+        The returned schedule also carries schedule.removed listing any dropped conflicting tasks."""
+        schedule = Schedule(day=day)
         schedule.generate_plan(self.owner, self.tasks)
         self.schedule = schedule
         return schedule

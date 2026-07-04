@@ -68,7 +68,12 @@ pytest --cov
 Sample test output:
 
 ```
-# Paste your pytest output here
+Daily plan for Bon (German Shepard):
+  18:45 — Wash Bon (15 min) [priority: high]
+  11:00 — Walk Bon (150 min) [priority: medium]
+Daily plan for Alex (Calico):
+  08:00 — Groom Alex (60 min) [priority: medium]
+  13:30 — Play with Alex (60 min) [priority: low]
 ```
 
 ## 📐 Smarter Scheduling
@@ -86,10 +91,13 @@ Sample test output:
 
 Describe your app in numbered steps so a reader can follow along without watching a video:
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+1. Create a new pet and your time slots 8:00 to 19:00
+2. Add a new task with the selected time, 11:30 to 12:00, daily, High priority
+3. Add another task 11:45 to 13:45 (or any combination that overlaps with the first) Weekly on wednesday, low priority.
+4. Run the scheduler with today's date (assuming today is wednesday)
+5. Only the first task would be scheduled. 
+6. Click complete on the first task. Only the second task would be scheduled. 
+7. Generate a schedule for tomorrow, the first task reappears as it would have refreshed. Second task is not scheduled as it's not wednesday.
+8. Click complete on both tasks, select the next week's wednesday and generate a schedule. Only the first task should generate but a message about the second task being dropped due to conflicts appears below the scheduler.
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->

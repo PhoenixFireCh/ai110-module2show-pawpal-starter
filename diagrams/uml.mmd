@@ -7,6 +7,7 @@ classDiagram
         +str breed
         +float height
         +str color
+        +str gender
         +str extra_info
         +describe() str
     }
@@ -14,7 +15,6 @@ classDiagram
     class Owner {
         +str name
         +TimeWindow availability
-        +time time_constraint
         +available_minutes() int
     }
 
@@ -32,25 +32,29 @@ classDiagram
         +bool completed
         +TimeWindow time_window
         +Pet pet
+        +date task_date
+        +date last_completed
         +toggle_complete() void
+        +refresh_recurrence() void
     }
 
     class Schedule {
         +date day
         +List~Task~ entries
+        +List removed
         +generate_plan(owner: Owner, tasks: List~Task~) void
-        +add_entry(task: Task) void
         +total_minutes() int
+        +print_plan() void
     }
 
-    class Account {
+    class Scheduler {
         +Owner owner
         +List~Pet~ pets
         +List~Task~ tasks
         +Schedule schedule
-        +add_pet(pet: Pet) void
-        +add_task(task: Task) void
-        +create_schedule() Schedule
+        +add_pet(name: str, species: str, breed: str, height: float, color: str, gender: str, extra_info: str) void
+        +add_task(title: str, priority: Priority, repeats: Recurrence, time_window: TimeWindow, pet: Pet, task_date: date) void
+        +create_schedule(day: date) Schedule
     }
 
     class Priority {
@@ -67,10 +71,10 @@ classDiagram
         WEEKLY
     }
 
-    Account "1" --> "1" Owner : has
-    Account "1" --> "0..*" Pet : tracks
-    Account "1" --> "0..*" Task : collects
-    Account "1" --> "0..1" Schedule : current
+    Scheduler "1" --> "1" Owner : has
+    Scheduler "1" --> "0..*" Pet : tracks
+    Scheduler "1" --> "0..*" Task : collects
+    Scheduler "1" --> "0..1" Schedule : current
     Owner "1" *-- "1" TimeWindow : availability
     Task --> Priority : has
     Task --> Recurrence : repeats

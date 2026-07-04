@@ -2,7 +2,7 @@
 
 from datetime import time
 
-from pawpal_system import Account, Owner, Priority, Recurrence, TimeWindow, Task
+from pawpal_system import Scheduler, Owner, Priority, Recurrence, TimeWindow, Task
 
 
 def test_toggle_complete_changes_status():
@@ -15,7 +15,7 @@ def test_toggle_complete_changes_status():
 
 def test_add_task_with_valid_pet():
     """Adding a task with a valid pet should store the task and keep that pet attached."""
-    acc = Account(Owner("Harrison", TimeWindow(time(6, 0), time(20, 0))))
+    acc = Scheduler(Owner("Harrison", TimeWindow(time(6, 0), time(20, 0))))
     acc.add_pet("Alex", "Cat", "Calico", 2.2, "Orange", "Female")
     pet = acc.pets[0]
 
