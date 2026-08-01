@@ -14,4 +14,4 @@ acc.add_task("Feed Alex", Priority.HIGH, Recurrence.DAILY, TimeWindow(time(4, 00
 acc.add_task("Groom Alex", Priority.MEDIUM, Recurrence.DAILY, TimeWindow(time(8, 00), time(9, 00)), acc.pets[1])
 acc.add_task("Take Bon to Training", Priority.HIGH, Recurrence.WEEKLY, TimeWindow(time(8, 30), time(9, 30)), acc.pets[0], date(2026, 6, 29))
 acc.add_task("Take Alex to Fair", Priority.HIGH, Recurrence.NONE, TimeWindow(time(8, 30), time(9, 30)), acc.pets[0], date(2026, 6, 30))
-acc.create_schedule(date.today()).print_plan()
+acc.create_schedule(day=date.today()).print_plan()

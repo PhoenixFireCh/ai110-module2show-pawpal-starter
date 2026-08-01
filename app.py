@@ -1,21 +1,16 @@
+import os
+
 import streamlit as st
 
 from datetime import date, time
 
 from pawpal_system import Scheduler, Owner, TimeWindow, Priority, Recurrence
+from schedule_agent import GeminiScheduleAgent, HeuristicScheduleAgent
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
-st.title("🐾 PawPal+")
+st.title("🐾 PawPal++")
 st.caption("Plan daily pet care tasks for an owner and their pets.")
-
-with st.expander("Scenario", expanded=False):
-    st.markdown(
-        """
-**PawPal+** is a pet care planning assistant. It helps a pet owner plan care tasks
-for their pet(s) based on constraints like time, priority, and recurrence.
-"""
-    )
 
 st.divider()
 
@@ -130,30 +125,63 @@ st.divider()
 
 st.subheader("Build Schedule")
 
-# Let the user pick which day to plan for, defaulting to today.
-schedule_day = st.date_input("Schedule day", value=date.today())
+# Free-text instruction that drives the scheduling AI (replaces the day picker).
+instruction = st.text_area(
+    "Describe the schedule you want",
+    placeholder=(
+        "e.g. 'Give me a recommended schedule for tomorrow that spaces out walks and "
+        "feedings', 'Schedule my tasks for the day after tomorrow using the times I "
+        "entered', or 'Plan my tasks for 8/5/2026'"
+    ),
+)
+
+# Resolve the Google AI Studio (Gemini) API key in code: Streamlit secrets first,
+# then the environment. With no key we fall back to the offline planner.
+try:
+    secret_key = st.secrets.get("GOOGLE_API_KEY", "")
+except Exception:
+    # No secrets file configured — that's fine, just skip it.
+    secret_key = ""
+api_key = secret_key or os.environ.get("GOOGLE_API_KEY", "")
+
+if api_key:
+    agent = GeminiScheduleAgent(api_key)
+else:
+    agent = HeuristicScheduleAgent()
+    st.caption("No Gemini API key configured — using the offline planner.")
 
 if st.button("Generate schedule", disabled=owner_time_invalid):
-    # Build the plan for the chosen day from the scheduler's owner and tasks.
-    schedule = scheduler.create_schedule(schedule_day)
-    st.write(f"Daily plan for {schedule.day} ({schedule.day.strftime('%A')})")
-    if schedule.entries:
-        rows = [
-            {
-                "Time": f"{entry.time_window.start.strftime('%H:%M')}-{entry.time_window.end.strftime('%H:%M')}",
-                "Task": entry.title,
-                "Pet": entry.pet.name if entry.pet else "-",
-                "Priority": entry.priority.value,
-            }
-            for entry in schedule.entries
-        ]
-        st.table(rows)
-    else:
-        st.info("No valid tasks for today. Add incomplete tasks within the owner's availability.")
+    # Let the AI build the plan from the current tasks and the instruction.
+    schedule = scheduler.create_schedule(instruction, agent=agent)
 
-    # Notify which active tasks were dropped due to conflicts, and why.
-    if schedule.removed:
-        st.warning("Some tasks were removed from the plan:")
-        for task, reason in schedule.removed:
-            window = f"{task.time_window.start.strftime('%H:%M')}-{task.time_window.end.strftime('%H:%M')}"
-            st.write(f"- {task.title} ({window}) — {reason}")
+    # Box 1: the generated schedule (same format as before).
+    with st.container(border=True):
+        st.write(f"Daily plan for {schedule.day} ({schedule.day.strftime('%A')})")
+        if schedule.entries:
+            rows = [
+                {
+                    "Time": f"{entry.time_window.start.strftime('%H:%M')}-{entry.time_window.end.strftime('%H:%M')}",
+                    "Task": entry.title,
+                    "Pet": entry.pet.name if entry.pet else "-",
+                    "Priority": entry.priority.value,
+                }
+                for entry in schedule.entries
+            ]
+            st.table(rows)
+        else:
+            st.info(
+                f"No valid tasks for {schedule.day.strftime('%A, %B %d, %Y')}. Add incomplete "
+                "tasks that occur on that day and fall within the owner's availability."
+            )
+
+        # Notify which active tasks were dropped due to conflicts, and why.
+        if schedule.removed:
+            st.warning("Some tasks were removed from the plan:")
+            for task, reason in schedule.removed:
+                window = f"{task.time_window.start.strftime('%H:%M')}-{task.time_window.end.strftime('%H:%M')}"
+                st.write(f"- {task.title} ({window}) — {reason}")
+
+    # Box 2: the AI's reasoning for this plan.
+    with st.container(border=True):
+        st.subheader("AI reasoning")
+        st.write(schedule.reasoning or "No reasoning provided.")

@@ -132,76 +132,31 @@ class Schedule:
     entries: list[Task] = field(default_factory=list)
     # Tasks dropped while planning, each paired with the reason it was removed.
     removed: list = field(default_factory=list)
+    # Human-readable explanation from the agent that built this plan.
+    reasoning: str = ""
 
-    def generate_plan(self, owner: Owner, tasks: list[Task]) -> None:
-        """Build self.entries to fit as many non-overlapping tasks as possible: higher-priority
-        tasks claim slots first, and within each priority earliest-finishing tasks are preferred.
-        Also records into self.removed any active task dropped for conflicting reasons."""
-        self.entries = []
-        self.removed = []
-        # Rank priorities so HIGH outranks MEDIUM outranks LOW.
-        rank = {Priority.LOW: 0, Priority.MEDIUM: 1, Priority.HIGH: 2}
+    def generate_plan(self, owner: Owner, tasks: list[Task], instruction: str = "", agent=None) -> None:
+        """Build the day's plan by delegating to a scheduling agent.
 
-        # Keep only tasks active on this day: with a window, still pending, and matching recurrence.
-        # A completed recurring task counts as pending again once the schedule's day falls in a new
-        # period than when it was last completed (a new day for daily, a new ISO week for weekly).
-        # This check is read-only -- it never unmarks the task's completed flag.
-        active = [
-            task
-            for task in tasks
-            if task.time_window is not None
-            and (
-                not task.completed
-                or (
-                    task.repeats is Recurrence.DAILY
-                    and task.last_completed is not None
-                    and task.last_completed < self.day
-                )
-                or (
-                    task.repeats is Recurrence.WEEKLY
-                    and task.last_completed is not None
-                    and task.last_completed.isocalendar()[:2] < self.day.isocalendar()[:2]
-                )
-            )
-            and (
-                task.repeats is Recurrence.DAILY
-                or (task.repeats is Recurrence.NONE and task.task_date == self.day)
-                or (
-                    task.repeats is Recurrence.WEEKLY
-                    and task.task_date is not None
-                    and task.task_date.weekday() == self.day.weekday()
-                )
-            )
-        ]
+        The agent reads the current task list plus a free-text ``instruction`` and
+        produces the plan. When ``agent`` is None the deterministic offline planner
+        (HeuristicScheduleAgent) is used, which keeps entered times and reproduces
+        the original greedy behaviour. The agent sets ``self.entries`` (chosen
+        Tasks), ``self.removed`` (dropped ``(Task, reason)`` pairs), and
+        ``self.reasoning`` (why it chose this plan)."""
+        # Lazy import avoids a circular import: schedule_agent imports this module.
+        from schedule_agent import HeuristicScheduleAgent
 
-        # Drop active tasks that fall outside the owner's availability, recording the reason.
-        candidates = []
-        for task in active:
-            if owner.availability.contains(task.time_window.start) and owner.availability.contains(
-                task.time_window.end
-            ):
-                candidates.append(task)
-            else:
-                self.removed.append((task, "outside the owner's availability window"))
-
-        # Highest priority first; within a priority, earliest end time maximizes how many fit.
-        candidates.sort(key=lambda task: (-rank[task.priority], task.time_window.end))
-
-        # Greedily add each task unless it overlaps one already chosen; record the clash otherwise.
-        for task in candidates:
-            conflict = next(
-                (
-                    entry
-                    for entry in self.entries
-                    if task.time_window.start < entry.time_window.end
-                    and entry.time_window.start < task.time_window.end
-                ),
-                None,
-            )
-            if conflict is None:
-                self.entries.append(task)
-            else:
-                self.removed.append((task, f"overlaps with '{conflict.title}'"))
+        if agent is None:
+            agent = HeuristicScheduleAgent()
+        result = agent.plan(self.day, owner, tasks, instruction)
+        self.entries = result.entries
+        self.removed = result.removed
+        self.reasoning = result.reasoning
+        # The agent may resolve a different day from the instruction (e.g.
+        # "tomorrow"); adopt it so the plan is labelled with the day it's for.
+        if result.scheduled_date is not None:
+            self.day = result.scheduled_date
 
     def total_minutes(self) -> int:
         """Total minutes consumed by all scheduled entries."""
@@ -268,10 +223,15 @@ class Scheduler:
             Task(title, priority, repeats, time_window=time_window, pet=pet, task_date=task_date)
         )
 
-    def create_schedule(self, day: date) -> Schedule:
-        """Build the schedule for the given day from the owner and tasks, store it, and return it.
-        The returned schedule also carries schedule.removed listing any dropped conflicting tasks."""
-        schedule = Schedule(day=day)
-        schedule.generate_plan(self.owner, self.tasks)
+    def create_schedule(self, instruction: str = "", agent=None, day: date | None = None) -> Schedule:
+        """Build the schedule from the owner and tasks, store it, and return it.
+
+        The agentic ``agent`` interprets the free-text ``instruction`` to decide what
+        to schedule (and whether to keep entered times or recommend new ones). When
+        ``agent`` is None the offline planner is used. ``day`` anchors the plan and
+        defaults to today. The returned schedule carries ``entries``, ``removed``
+        (dropped conflicting tasks with reasons), and ``reasoning``."""
+        schedule = Schedule(day=day or date.today())
+        schedule.generate_plan(self.owner, self.tasks, instruction, agent)
         self.schedule = schedule
         return schedule
