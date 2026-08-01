@@ -20,7 +20,7 @@ Finally, done! Output should be given at the bottom of the prompt window which i
 # Sample Inputs & Outputs
 The examples below are live outputs from the Gemini agent (`gemini-flash-lite-latest`). Each shows the account, pets, tasks, and free-text instruction that go in, and the plan, removed tasks, and AI reasoning that come out.
 
-## Example 1 — keep entered times, resolve conflicts
+Example 1 — keep entered times, resolve conflicts
 **Input**
 - Owner: Jordan — available 08:00–17:00
 - Pets: Mochi (Male tan Corgi dog, 1.0 ft), Luna (Female gray Tabby cat, 0.8 ft)
@@ -44,7 +44,7 @@ Removed:
 
 AI reasoning: Scheduled tasks [0], [1], and [2] within availability. Task [1] (08:15-08:45) clashes with task [0] (08:00-08:30). Task [0] has high priority and is kept, while task [1] is removed due to overlap and lower priority sequence. Task [3] is removed because its entered time (18:00-18:30) is outside the owner's availability (08:00-17:00).
 
-## Example 2 — recommended plan (re-times tasks) with a weekly task
+Example 2 — recommended plan (re-times tasks) with a weekly task
 **Input**
 - Owner: Priya — available 07:00–20:00
 - Pets: Rex (Male black Labrador dog, 2.0 ft)
@@ -68,7 +68,7 @@ Removed: (none)
 
 AI reasoning: Scheduled tasks for Saturday, August 1, 2026, including daily walks/feedings and weekly grooming. Adjusted walk and feeding times to space them evenly throughout Priya's 07:00-20:00 availability.
 
-## Example 3 — add a new task on request (pinned to a pet)
+Example 3 — add a new task on request (pinned to a pet)
 **Input**
 - Owner: Sam — available 09:00–18:00
 - Pets: Biscuit (Female brown Beagle dog, 1.2 ft)
@@ -91,6 +91,27 @@ AI reasoning: Scheduled tasks 0 and 1 within the owner's availability using thei
 
 # Design decisions
 Certain features such as the ability to modify the user's task list is not added due to the un-predictable and possibly destructive nature of the AI, which necessicated further complicated output guardrails that I do not have enough time to add. However, I was still able to add the core feature of this addition which enables the user to generate and modify their plans on the fly, which only requires basic sanitation guardrails.
+
+# Testing summary
+Certain things that worked well was the AI being able to articulate tasks and produce a result. However, the thing that did not work well was ensuring the agentic AI's response is correct during the testing proccess, which required me to fine tune the prompt in order for the AI to respond correctly. This made me learn that when using AI, you might need to tune it in order for it to 
+work in the way you intended.
+
+# Reflection
+What this taught me about AI and problem solving is to not rely on AI too heavily in certain cases as it can make mistakes that causes endless headaches. So it is important to use your own ideas 
+and initiative to identify bugs in your system.
+
+
+# Testing
+In terms of error handling, the code automatically notify's the user when the LLM is not working by giving them a reason as to 
+why and attempts to use the heuristic scheduler.
+
+
+| Test Input                                 | Evaluation Criteria                      | Result      |
+|--------------------------------------------|------------------------------------------|-------------|
+| "Can you make me a schedule for tomorrow?" | Tasks are alloted in the correct days    | Pass (previous Fail as it constantly referenced today's time) |
+| "Can you make a schedule for today?"  | Tasks do not overlap | Pass    |
+| "Can you add a new task for today from 10:30 to 11:00 called "Shower" for my pet Mochi with medium priority?"| Task is added on schedule creation and is correctly added or removed | Pass |
+| "Can you make a schedule for today and can you make the task "Fair" weekly?" | Task is added on schedule creation and is correctly added or removed on the correct day | Pass|
 
 
 
