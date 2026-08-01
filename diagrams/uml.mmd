@@ -1,6 +1,27 @@
 classDiagram
-    direction LR
+    direction TB
 
+    %% =====================================================================
+    %% PawPal+ system UML
+    %% Data flow is numbered on the arrows: (1) human input -> (2)-(7)
+    %% processing through the agents -> (8) output back to the human.
+    %% Human and testing checkpoints are marked with notes.
+    %% =====================================================================
+
+    %% ---------------- Human input / output boundary (app.py) -------------
+    class StreamlitApp {
+        <<UI - human in the loop>>
+        +owner + availability form
+        +pet form
+        +task form + completion checkboxes
+        +free-text schedule instruction
+        +Generate schedule button
+        +plan table + removed-task warnings
+        +AI reasoning panel
+    }
+    note for StreamlitApp "HUMAN CHECKPOINT: the user enters all input, then reviews the generated plan, the removed tasks (with reasons), and the AI's reasoning before trusting or re-prompting it."
+
+    %% ---------------- Domain model (pawpal_system.py) --------------------
     class Pet {
         +str name
         +str species
@@ -38,25 +59,6 @@ classDiagram
         +refresh_recurrence() void
     }
 
-    class Schedule {
-        +date day
-        +List~Task~ entries
-        +List removed
-        +generate_plan(owner: Owner, tasks: List~Task~) void
-        +total_minutes() int
-        +print_plan() void
-    }
-
-    class Scheduler {
-        +Owner owner
-        +List~Pet~ pets
-        +List~Task~ tasks
-        +Schedule schedule
-        +add_pet(name: str, species: str, breed: str, height: float, color: str, gender: str, extra_info: str) void
-        +add_task(title: str, priority: Priority, repeats: Recurrence, time_window: TimeWindow, pet: Pet, task_date: date) void
-        +create_schedule(day: date) Schedule
-    }
-
     class Priority {
         <<enumeration>>
         LOW
@@ -71,6 +73,81 @@ classDiagram
         WEEKLY
     }
 
+    class Schedule {
+        +date day
+        +List~Task~ entries
+        +List removed
+        +str reasoning
+        +generate_plan(owner, tasks, instruction, agent) void
+        +total_minutes() int
+        +print_plan() void
+    }
+
+    class Scheduler {
+        +Owner owner
+        +List~Pet~ pets
+        +List~Task~ tasks
+        +Schedule schedule
+        +add_pet(...) void
+        +add_task(...) void
+        +create_schedule(instruction, agent, day) Schedule
+    }
+
+    %% ---------------- Agent layer (schedule_agent.py) --------------------
+    class ScheduleResult {
+        +List~Task~ entries
+        +List removed
+        +str reasoning
+        +date scheduled_date
+    }
+
+    class HeuristicScheduleAgent {
+        <<offline planner>>
+        +plan(day, owner, tasks, instruction) ScheduleResult
+    }
+
+    class GeminiScheduleAgent {
+        <<LLM agent>>
+        +str api_key
+        +str model
+        -_sanitizer: _OutputSanitizer
+        +plan(day, owner, tasks, instruction) ScheduleResult
+        -_user_prompt(owner, tasks, instruction) str
+        -_build_result(data, tasks) ScheduleResult
+        -_fallback(day, owner, tasks, instruction, note) ScheduleResult
+    }
+    note for GeminiScheduleAgent "TEMPORARY TASKS: the AI may invent one-off tasks (new_entries), optionally naming a pet in text. They pass through _OutputSanitizer like any entry — which also strips hallucinated pet names — but are never added to Scheduler.tasks."
+
+    class _OutputSanitizer {
+        <<output guardrail>>
+        +validate(result, owner, known_pets) ScheduleResult
+    }
+    note for _OutputSanitizer "AUTOMATED CHECK on AI results: drops any AI-proposed entry — including temporary invented tasks — outside the owner's availability or overlapping another entry, and strips a pinned pet the owner doesn't actually have (anti-hallucination), recording a reason in removed."
+
+    class AgentHelper {
+        <<module: agent_helper.py>>
+        +SCHEDULE_SCHEMA
+        +SCHEDULE_SCHEMA_WITH_NEW
+        +_system_prompt() str
+        +_strip_code_fences(text) str
+        +_parse_time(value) time
+        +_parse_iso_date(value) date
+    }
+
+    class GeminiAPI {
+        <<external service>>
+        +generate_content(model, contents, config) JSON
+    }
+
+    %% ---------------- Testing (tests/test_pawpal.py) ---------------------
+    class PytestSuite {
+        <<tests>>
+        +test_toggle_complete_changes_status()
+        +test_add_task_with_valid_pet()
+    }
+    note for PytestSuite "TESTING CHECKPOINT: pytest verifies core domain behavior (task completion, task/pet wiring) that the agents' plans depend on."
+
+    %% ---------------- Domain structure ------------------------------------
     Scheduler "1" --> "1" Owner : has
     Scheduler "1" --> "0..*" Pet : tracks
     Scheduler "1" --> "0..*" Task : collects
@@ -81,5 +158,22 @@ classDiagram
     Task "1" --> "0..1" TimeWindow : window
     Task "1" --> "0..1" Pet : cares for
     Schedule "1" *-- "0..*" Task : contains
-    Schedule ..> Owner : plans for
-    Schedule ..> Task : plans from
+
+    %% ---------------- Data flow: input -> process -> output ---------------
+    StreamlitApp --> Scheduler : (1) INPUT owner, pets, tasks, instruction
+    Scheduler --> Schedule : (2) create_schedule()
+    Schedule ..> HeuristicScheduleAgent : (3a) plan() - no API key
+    Schedule ..> GeminiScheduleAgent : (3b) plan() - Gemini key set
+    GeminiScheduleAgent ..> AgentHelper : system prompt, JSON schema, parsing
+    GeminiScheduleAgent --> GeminiAPI : (4) prompt = availability + all tasks + instruction
+    GeminiAPI --> GeminiScheduleAgent : (5) structured JSON plan + temporary new_entries
+    GeminiScheduleAgent --> _OutputSanitizer : (6) validate AI output (existing + temporary)
+    GeminiScheduleAgent ..> HeuristicScheduleAgent : fallback on API/parse failure
+    HeuristicScheduleAgent --> ScheduleResult : produces
+    GeminiScheduleAgent --> ScheduleResult : produces
+    ScheduleResult --> Schedule : (7) entries, removed, reasoning, day
+    Schedule --> StreamlitApp : (8) OUTPUT plan table + removed reasons + AI reasoning
+
+    %% ---------------- Testing relationships -------------------------------
+    PytestSuite ..> Scheduler : verifies add_task / pet wiring
+    PytestSuite ..> Task : verifies toggle_complete

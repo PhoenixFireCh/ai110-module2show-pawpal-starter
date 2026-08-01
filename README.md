@@ -1,103 +1,97 @@
 # PawPal+ (Module 2 Project)
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+It's goal is to allow for pet owners to schedule and create and manage tasks easily and effectively. It can take in created account, pets, and tasks to create a rigid schedule based on priorities.
 
-## Scenario
+Now with...
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+# PawPal++
+You are able to do the previous, but you are able to more flexibly and easily change schedules or tasks on a dime. Since planning is long an tedious and a task may change at any moment, using the built in agentic AI, it is able to adjust to new parameters you put in as well as generating a schedule.
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+# Architecture Overview
+- In pawpal_system.py, it includes the basic objects to tasks, schedule, pets, and owner, where schedule calls functions in schedule_agent.py to build the schedule itself.
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+- In schedule_agent.py, there are functions that prepares the prompt, generates it via the LLM or heuristicly, ensures output are correct via a guardrail, and puts out a resoning and the formatted output.
 
-## What you will build
+# Instructions
+First, create your account, add pets, and add any tasks.
+Second, ask a question such as "can you generate me a schedule for today"?
+Finally, done! Output should be given at the bottom of the prompt window which includes the schedule and reason. 
 
-Your final app should:
+# Sample Inputs & Outputs
+The examples below are live outputs from the Gemini agent (`gemini-flash-lite-latest`). Each shows the account, pets, tasks, and free-text instruction that go in, and the plan, removed tasks, and AI reasoning that come out.
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+## Example 1 — keep entered times, resolve conflicts
+**Input**
+- Owner: Jordan — available 08:00–17:00
+- Pets: Mochi (Male tan Corgi dog, 1.0 ft), Luna (Female gray Tabby cat, 0.8 ft)
+- Tasks:
+  - Morning walk — high, daily, 08:00–08:30, Mochi
+  - Morning feeding — high, daily, 08:15–08:45, Luna
+  - Afternoon meds — medium, daily, 13:00–13:15, Luna
+  - Evening walk — low, daily, 18:00–18:30, Mochi
+- Instruction: *"Plan my tasks for August 3, 2026 using the times I entered."*
 
-## Getting started
+**Output** — Daily plan for 2026-08-03 (Monday)
 
-### Setup
+| Time | Task | Pet | Priority |
+| --- | --- | --- | --- |
+| 08:00–08:30 | Morning walk | Mochi | high |
+| 13:00–13:15 | Afternoon meds | Luna | medium |
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
+Removed:
+- Morning feeding (08:15–08:45) — Clashes with higher priority task [0] at 08:00-08:30
+- Evening walk (18:00–18:30) — Outside owner's availability window of 08:00-17:00
 
-### Suggested workflow
+AI reasoning: Scheduled tasks [0], [1], and [2] within availability. Task [1] (08:15-08:45) clashes with task [0] (08:00-08:30). Task [0] has high priority and is kept, while task [1] is removed due to overlap and lower priority sequence. Task [3] is removed because its entered time (18:00-18:30) is outside the owner's availability (08:00-17:00).
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+## Example 2 — recommended plan (re-times tasks) with a weekly task
+**Input**
+- Owner: Priya — available 07:00–20:00
+- Pets: Rex (Male black Labrador dog, 2.0 ft)
+- Tasks:
+  - Morning walk — high, daily, 07:00–07:30, Rex
+  - Lunch feeding — high, daily, 12:00–12:20, Rex
+  - Evening walk — medium, daily, 17:00–17:45, Rex
+  - Grooming — low, weekly (Saturdays), 10:00–11:00, Rex
+- Instruction: *"Give me a recommended schedule for Saturday, August 1, 2026 that spaces the walks and feedings evenly through the day."*
 
-## 🖥️ Sample Output
+**Output** — Daily plan for 2026-08-01 (Saturday)
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+| Time | Task | Pet | Priority |
+| --- | --- | --- | --- |
+| 07:00–07:30 | Morning walk | Rex | high |
+| 11:00–11:20 | Lunch feeding | Rex | high |
+| 13:00–14:00 | Grooming | Rex | low |
+| 17:30–18:15 | Evening walk | Rex | medium |
 
-```
-#Daily plan for Bon (German Shepard):
-#08:30 — Take Bon to Training (60 min) [priority: high]
-#18:45 — Wash Bon (15 min) [priority: high]
-#11:00 — Walk Bon (150 min) [priority: medium]
-#Daily plan for Alex (Calico):
-#13:30 — Play with Alex (60 min) [priority: low]
-```
+Removed: (none)
 
-## 🧪 Testing PawPal+
+AI reasoning: Scheduled tasks for Saturday, August 1, 2026, including daily walks/feedings and weekly grooming. Adjusted walk and feeding times to space them evenly throughout Priya's 07:00-20:00 availability.
 
-```bash
-# Run the full test suite:
-pytest
+## Example 3 — add a new task on request (pinned to a pet)
+**Input**
+- Owner: Sam — available 09:00–18:00
+- Pets: Biscuit (Female brown Beagle dog, 1.2 ft)
+- Tasks:
+  - Morning walk — high, daily, 09:00–09:30, Biscuit
+  - Afternoon feeding — medium, daily, 13:00–13:20, Biscuit
+- Instruction: *"Plan August 3, 2026 with my entered times, and also add a 15-minute water refill for Biscuit in the early afternoon."*
 
-# Run with coverage:
-pytest --cov
-```
+**Output** — Daily plan for 2026-08-03 (Monday)
 
-Sample test output:
+| Time | Task | Pet | Priority |
+| --- | --- | --- | --- |
+| 09:00–09:30 | Morning walk | Biscuit | high |
+| 13:00–13:20 | Afternoon feeding | Biscuit | medium |
+| 13:30–13:45 | Water refill | Biscuit | medium |
 
-```
-Daily plan for Bon (German Shepard):
-  18:45 — Wash Bon (15 min) [priority: high]
-  11:00 — Walk Bon (150 min) [priority: medium]
-Daily plan for Alex (Calico):
-  08:00 — Groom Alex (60 min) [priority: medium]
-  13:30 — Play with Alex (60 min) [priority: low]
-```
+Removed: (none)
 
-## 📐 Smarter Scheduling
+AI reasoning: Scheduled tasks 0 and 1 within the owner's availability using their entered times, and added the new water refill task for Biscuit as requested in the early afternoon without overlap.
 
-> Fill in once you've implemented scheduling logic.
+# Design decisions
+Certain features such as the ability to modify the user's task list is not added due to the un-predictable and possibly destructive nature of the AI, which necessicated further complicated output guardrails that I do not have enough time to add. However, I was still able to add the core feature of this addition which enables the user to generate and modify their plans on the fly, which only requires basic sanitation guardrails.
 
-| Feature | Method(s) | Notes |
-|---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
 
-## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
 
-1. Create a new pet and your time slots 8:00 to 19:00
-2. Add a new task with the selected time, 11:30 to 12:00, daily, High priority
-3. Add another task 11:45 to 13:45 (or any combination that overlaps with the first) Weekly on wednesday, low priority.
-4. Run the scheduler with today's date (assuming today is wednesday)
-5. Only the first task would be scheduled. 
-6. Click complete on the first task. Only the second task would be scheduled. 
-7. Generate a schedule for tomorrow, the first task reappears as it would have refreshed. Second task is not scheduled as it's not wednesday.
-8. Click complete on both tasks, select the next week's wednesday and generate a schedule. Only the first task should generate but a message about the second task being dropped due to conflicts appears below the scheduler.
-
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
